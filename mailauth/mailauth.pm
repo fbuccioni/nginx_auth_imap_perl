@@ -10,16 +10,16 @@ package mailauth;
         my $pass     = shift;
         my $host     = shift;
         my $port     = shift;
-	my $type     = shift;
+        my $type     = shift;
         my $authmech = shift; 
         my ($imap, $connected);
 
-	#open(LOG, '>> /etc/nginx/auth.log');
+        #open(LOG, '>> /etc/nginx/auth.log');
         $imap = Mail::IMAPClient->new(
              Server          => $host
              , User          => $user
              , Password      => $pass
-	     , Port          => $port
+             , Port          => $port
              , Starttls      => (lc($type) eq 'starttls')
              , Ssl           => (lc($type) eq 'ssl')
              , Authmechanism => uc($authmech)
@@ -27,44 +27,42 @@ package mailauth;
              #, Debug_fh      => \*LOG
         );
 
-	$imap->disconnect() if($connected = defined($imap));
-	return $connected;
+        $imap->disconnect() if($connected = defined($imap));
+        return $connected;
     }
-   
+  
+ 
     sub handler {
         my $r=shift; 
-        my ($domain, $host, $port, $type, $authmech);
-        my ($user, $pass) = ($r->header_in('Auth-User'), $r->header_in('Auth-Pass'));
-	my $auth_domain  = (split(/@/, $user))[1];
-        my $domain_found = 0; 
+        *get_conn_data=shift();
 
-	if($auth_domain) {
- 	     open(CONF, "< /etc/nginx/mail_proxy");
-             while (my($line)=<CONF>) {
-                 $line =~ s/#.*$//;
-                 $line =~ s/\s$//g;
-                 $line =~ s/^\s//g;
-         
-                 if($line) {
-                     ($domain, $host, $port, $type, $authmech) = split(/\s+/, $line);
-                     if ($domain eq $auth_domain ) {
-                         $domain_found = 1;
-                         last;
-                     }
-                 }
-             }
-             close(CONF);
+        my ($user, $pass) = ($r->header_in('Auth-User'), $r->header_in('Auth-Pass'));
+        my ($user_at_domain, $domain);
+        my $has_auth = $user && $pass;
+
+        if($has_auth) {
+            $user_at_domain = $r->header_in('Auth-User');
+        } else {
+            $user_at_domain = $r->header_in('Auth-SMTP-To');
+            $user_at_domain =~ s/^.*?<(.*?)>.*$/$1/g;
         }
 
-        if (  $domain_found
-              && auth(
-                      $user
-                    , $pass
-                    , $host
-		    , $port
-                    , $type
-                    , $authmech
-             )
+        $domain  = (split(/@/, $user_at_domain))[1];
+        
+        my ($host, $port, $type, $authmech) = get_conn_data($domain, $r);
+
+        if (  defined $host
+              && (
+                    !$has_auth
+                    || auth(
+                          $user
+                        , $pass
+                        , $host
+                        , $port
+                        , $type
+                        , $authmech
+                   )
+              )
         ) {
             $r->header_out("Auth-Status", "OK") ;
             $r->header_out("Auth-Server", $host);
@@ -72,7 +70,12 @@ package mailauth;
             $r->header_out("Auth-User",$user);
             $r->header_out("Auth-Pass",$pass);
         } else {
-            $r->header_out("Auth-Status", "Invalid login or password") ;
+            $r->header_out(
+                            "Auth-Status"
+                            , ($has_auth)
+                               ? "Authentication failed"
+                               : "Relay access denied"
+            ) ;
         }
    
         $r->send_http_header("text/html");
