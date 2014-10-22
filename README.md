@@ -24,7 +24,7 @@ Installation
 
 - Clone the code from github.
 
-        git clone git@github.com/falcacibar/nginx_auth_imap_perl
+        git clone git://github.com/falcacibar/nginx_auth_imap_perl
 
 - Copy the mailauth folder to some directory (any, this is just an example).
 
