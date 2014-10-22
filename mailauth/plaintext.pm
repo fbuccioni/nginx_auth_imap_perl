@@ -12,7 +12,7 @@ package mailauth::plaintext;
         my @data;
  
         if($domain) {
-            open(CONF, "< /etc/nginx/mail_proxy");
+            open(CONF, "< ".$r->variable('mailauth_db_path'));
             while (my($line)=<CONF>) {
                 $line =~ s/#.*$//;
                 $line =~ s/\s$//g;
