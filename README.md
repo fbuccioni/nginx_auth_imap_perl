@@ -60,7 +60,7 @@ Configuration
                                         SELECT      host, port, type, authmech
                                         FROM        imap_servers
                                         WHERE       name = ? 
-                                                    AND d.enabled = 1;
+                                                    AND enabled = 1;
              ";    
 
 
